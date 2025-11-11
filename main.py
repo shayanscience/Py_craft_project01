@@ -22,18 +22,19 @@
 import time
 import os
 import shutil
+import importlib
 
 
 
 #Messages Flag
-update_flag = True
-file_execution_flag = False
+isUpdateExist_flag = True
+fileExecuted_flag = False
 
 #directories
 mission_control = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_mission_control_project01\missionControl.py"
 craft_directory = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_craft_project01"
-craft_update = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_craft_project01\missionControl.py"
-
+# craft_update = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_craft_project01\missionControl.py"
+backup_file = "missionControl_backup.py"
 
 
 # Firmware Greeting - executes once
@@ -47,37 +48,56 @@ print(f"**** Date: {formatted} ****")
     Here is what function below does:
         - Define the global flags to the 'execute_update()'.
         - Look into the mission control directory, check if updates available.
-            - If update exists, set the 'update_flag'.
+            - If update exists, set the 'isUpdateExist_flag'.
                 - Check if similar file name exists on the craft.
                     - If it exists remove it first.
                 - If the similar file doesn't exists or removed, then move the existing available update
                     from the mission control into the craft.
                 - Checks if the update has ever been executed, if not, it proceeds.
-                - Sets the 'file_execution_flag' and executes the 'update01()', respectively. 
+                - Sets the 'fileExecuted_flag' and executes the 'update01()', respectively. 
         - If there is no update available, it prints the appropriate message that no update is available.
 """
 
 #executables
 def execute_update():
-    global update_flag, file_execution_flag
+    global isUpdateExist_flag, fileExecuted_flag, missionControl
     if (os.path.exists(mission_control)):               #Mission control directory check
-        update_flag = True
-        if(os.path.exists(craft_update)):               #Craft directory check
-            os.remove(craft_update)
+        isUpdateExist_flag = True
+        fileExecuted_flag = False 
+        if(os.path.exists("missionControl.py")):               #Craft directory check
+            os.remove("missionControl.py")
+        print("There is an update available!")
+        time.sleep(1)
+        print("Fetching the file...")
+        time.sleep(3)
         shutil.move(mission_control, craft_directory)
-        if(file_execution_flag==False):
-            import missionControl
-            file_execution_flag = True
-            print("There is an update available!")
-            time.sleep(1)
-            print("Fetching the file...")
-            time.sleep(3)
-            missionControl.update01()
+        import missionControl
+    
+    elif(os.path.exists("missioncontrol.py") & isUpdateExist_flag):
+        isUpdateExist_flag = False
+        fileExecuted_flag = False
+        import missionControl
+
     else:
-        if(update_flag):
-            print("No update available!")
-            print("Continouing previous instructions")
-            update_flag = False
+        if(fileExecuted_flag==False):
+            importlib.reload(missionControl)
+            fileExecuted_flag = True
+
+            try:
+                missionControl.update01()
+                isUpdateExist_flag = False
+            except Exception as e:
+                print(f"update failed: {e}")
+                shutil.copyfile("missionControl_backup.py", "missionControl.py")
+                print("Rolled back to previous version")
+                importlib.reload(missionControl)
+                fileExecuted_flag = False             #Resets the system (Treating as if the file has not been executed) since the update was bugged now we are going to run old firmware.
+                isUpdateExist_flag = True
+
+        # if(isUpdateExist_flag):
+        #     print("No update available!")
+        #     print("Continouing previous instructions")
+        #     isUpdateExist_flag = False
 
 
 
