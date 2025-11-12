@@ -23,6 +23,7 @@ import time
 import os
 import shutil
 import importlib
+import importlib.util
 
 
 
@@ -43,6 +44,14 @@ execution_date = time.localtime()                       # Get the local time
 formatted = time.strftime("%Y-%m-%d", execution_date)   # Convert time to formatted time (interested in date)
 print(f"**** Date: {formatted} ****")
 
+
+def load_mission_control(path="missionControl.py"):
+    if os.path.exists(path):
+        spec = importlib.util.spec_from_file_location("missionControl", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    return None
 
 """
     Here is what function below does:
@@ -66,39 +75,41 @@ def execute_update():
         fileExecuted_flag = False 
         if(os.path.exists("missionControl.py")):               #Craft directory check
             os.remove("missionControl.py")
-        print("There is an update available!")
+        print("Update available!")
         time.sleep(1)
-        print("Fetching the file...")
-        time.sleep(3)
+        print("Fetching the file", end="", flush=True)
+        for i in range(3):
+            if i<2:
+                print(".", end="", flush=True)
+            else:
+                print(".", flush=True)
+            time.sleep(1)
         shutil.move(mission_control, craft_directory)
-        import missionControl
+        missionControl = load_mission_control("missionControl.py")
+        # import missionControl
     
     elif(os.path.exists("missioncontrol.py") & isUpdateExist_flag):
         isUpdateExist_flag = False
         fileExecuted_flag = False
-        import missionControl
+        # import missionControl
+        missionControl = load_mission_control("missionControl.py")
 
     else:
         if(fileExecuted_flag==False):
-            importlib.reload(missionControl)
+            # importlib.reload(missionControl)
+            missionControl = load_mission_control("missionControl.py")
             fileExecuted_flag = True
-
-            try:
-                missionControl.update01()
-                isUpdateExist_flag = False
-            except Exception as e:
-                print(f"update failed: {e}")
-                shutil.copyfile("missionControl_backup.py", "missionControl.py")
-                print("Rolled back to previous version")
-                importlib.reload(missionControl)
-                fileExecuted_flag = False             #Resets the system (Treating as if the file has not been executed) since the update was bugged now we are going to run old firmware.
-                isUpdateExist_flag = True
-
-        # if(isUpdateExist_flag):
-        #     print("No update available!")
-        #     print("Continouing previous instructions")
-        #     isUpdateExist_flag = False
-
+            if missionControl:
+                try:
+                    missionControl.update01()
+                    isUpdateExist_flag = False
+                except Exception as e:
+                    print(f"update failed: {e}")
+                    shutil.copyfile("missionControl_backup.py", "missionControl.py")
+                    print("Rolled back to previous version")
+                    importlib.reload(missionControl)
+                    fileExecuted_flag = False             #Resets the system (Treating as if the file has not been executed) since the update was bugged now we are going to run old firmware.
+                    isUpdateExist_flag = True
 
 
 while True:
@@ -108,5 +119,5 @@ while True:
     execution_date = time.localtime() 
     test_formatted = time.strftime("%H:%M:%S", execution_date)  
     print("Time: ", test_formatted)
-    time.sleep(5)
+    time.sleep(1)
 
