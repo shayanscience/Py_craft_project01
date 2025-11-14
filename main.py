@@ -2,7 +2,7 @@
 # Release date 11/10/2025
 # Author: Shayan Sheikhrezaei
 # Email: Shayan_rezaei@cus.fullerton.edu
-# Firmware 1.2.1
+# Firmware 2.0.0
 
 ''' In Firmware 1.0.0 what we tried to acheive was to continuesly check if there is any update available. If so, we would go ahead
         and executes it. Later, I came up with the idea of what if we only connect to the mission control once and loose our connection
@@ -29,14 +29,13 @@ import sys
 
 
 #Messages Flag
-updateAvailable_flag = False
-fileExecuted_flag = False
-localFirmwareAvailable_flag = False     # This flag is added to indicate if firmware is available on craft local drive
+executed_flag = False
 
+state = "IDLE"
+timer = 0
 #directories
 mission_control = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_mission_control_project01\missionControl.py"
 craft_directory = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_craft_project01"
-# craft_update = r"C:\Users\ShayanSheikhrezaei\OneDrive - Orca Technologies\Personal\Projects\Programming\Py_craft_project01\missionControl.py"
 backup_file = "missionControl_backup.py"
 
 
@@ -82,14 +81,33 @@ def load_mission_control(path="missionControl.py"):
                 - Sets the 'fileExecuted_flag' and executes the 'update01()', respectively. 
         - If there is no update available, it prints the appropriate message that no update is available.
 """
-
-#executables
 def execute_update():
-    global updateAvailable_flag, fileExecuted_flag, localFirmwareAvailable_flag, missionControl
-    if (os.path.exists(mission_control)):               #Mission control directory check
-        updateAvailable_flag = True
-        fileExecuted_flag = False 
+    global state, timer, executed_flag, missionControl
+    if state=="IDLE":
+        # print("System Idle...")
+        timer += 1
+        if timer==5:
+            state="CHECK_FOR_UPDATE"
+            timer=0
+        # time.sleep(1)
+
+
+    
+    elif state=="CHECK_FOR_UPDATE":
+        
+        if (os.path.exists(mission_control)):   #only checks existence, not whether the remote file is actually newer than the local one.
+            print("IDLE -> REMOTE_AVAILABLE")
+            state="REMOTE_AVAILABLE"
+            time.sleep(1)
+        elif (os.path.exists(craft_directory+"\missionControl.py") and not executed_flag):
+            print("IDLE->LOCAL_AVAILABLE")
+            state="LOCAL_AVAILABLE"
+
+        
+    elif state=="REMOTE_AVAILABLE":
         if(os.path.exists("missionControl.py")):               #Craft directory check
+            print("Ereasing local firmware...")
+            time.sleep(1)
             os.remove("missionControl.py")
         else:    
             print("Update available!")
@@ -103,26 +121,37 @@ def execute_update():
                 time.sleep(1)                                   # Animation Ends
             shutil.move(mission_control, craft_directory)
             missionControl = load_mission_control("missionControl.py")
-    
-    elif(os.path.exists("missioncontrol.py") & ~updateAvailable_flag & ~localFirmwareAvailable_flag):
-        localFirmwareAvailable_flag = True
-        fileExecuted_flag = False
+            state="EXECUTING"
+            executed_flag = False
+
+    elif state=="LOCAL_AVAILABLE":
+        print("LOCAL_AVAILABLE")
         missionControl = load_mission_control("missionControl.py")
+        state="EXECUTING"
+        
+
+    elif state=="EXECUTING":
+        print("EXECUTING")
+        if missionControl:
+            try:
+                missionControl.update01()
+                state="IDLE"
+                executed_flag = True
+            except Exception as e:
+                print(f"update failed: {e}")
+                state="ROLLED_BACK"
+
+    elif state=="ROLLED_BACK":
+        print("Rolling back...")
+        time.sleep(1)
+        shutil.copyfile("missionControl_backup.py", "missionControl.py")
+        print("Rolled back to previous version")
+        importlib.reload(missionControl)
+        state="EXECUTING"
+        executed_flag = False
 
     else:
-        if(fileExecuted_flag==False):
-            fileExecuted_flag = True
-            if missionControl:
-                try:
-                    missionControl.update01()
-                    updateAvailable_flag = False
-                except Exception as e:
-                    print(f"update failed: {e}")
-                    shutil.copyfile("missionControl_backup.py", "missionControl.py")
-                    print("Rolled back to previous version")
-                    importlib.reload(missionControl)
-                    fileExecuted_flag = False             #Resets the system (Treating as if the file has not been executed) since the update was bugged now we are going to run old firmware.
-                    updateAvailable_flag = True
+        state = "IDLE"
 
 
 while True:
